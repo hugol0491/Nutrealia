@@ -26,50 +26,43 @@ const CONFIG = {
     caminar: { emoji: '🚶‍♀️', nombre: 'Caminata', kcalDefault: 100 },
   },
 
-  // Perfil para el prompt de sistema de Claude
-  perfil: `PERFIL:
-- Nombre: Mariana
-- Objetivo: mantener una alimentacion balanceada y saludable
-METAS DIARIAS BASE: 1,800 kcal | 120g proteina | 200g carbohidratos | 60g grasa
-AJUSTE ENTRENAMIENTO: cuando se registran kcal quemadas en ejercicio, ese total se suma a la meta base y el extra va integro a carbohidratos (kcal_ejercicio / 4 = gramos extra de carbs). La meta ajustada ya viene calculada en cada check-in.`,
+  // Perfil para el prompt de sistema de Claude (comprimido para ahorrar tokens)
+  perfil: 'Paciente: Mariana. Metas base: 1800kcal|120P|200C|60G. Ejercicio: +kcal a meta, extra va a carbs (kcal/4). Meta ajustada incluida en cada check-in.',
 
   // Restricciones alimentarias (dejar vacio si no aplica)
   restricciones: '',
 
+  // Modelos por funcion — Haiku es ~75% mas barato, adecuado para estimacion de macros
+  // Opciones: 'claude-sonnet-4-6' o 'claude-haiku-4-5-20251001'
+  modeloCheckin: 'claude-sonnet-4-6',
+  modeloCerrar: 'claude-sonnet-4-6',
+  modeloResumen: 'claude-sonnet-4-6',
+
   // Tamano maximo de foto en bytes (3 MB para no exceder limites de Netlify Functions)
   maxPhotoBytes: 3 * 1024 * 1024,
+
+  // Dimension maxima de foto en px (se redimensiona antes de enviar para ahorrar tokens de vision)
+  maxImagePx: 768,
 };
 
 // ─── SYSTEM PROMPTS ──────────────────────────
 
-const SYSTEM_CHECKIN = `Eres un asistente de nutricion profesional para ${CONFIG.nombre}. ${CONFIG.perfil}
-${CONFIG.restricciones ? 'RESTRICCIONES: ' + CONFIG.restricciones : ''}
-INSTRUCCIONES:
-1. Responde en espanol, tono amable y profesional. Unidades metricas.
-2. Fundamenta en evidencia cientifica.
-3. Cada check-in incluye: a) actividad y meta calorica ajustada, b) tabla metas vs consumido con checkmarks, c) UNA recomendacion accionable.
-4. Marca estimaciones como "(estimado)". Maximo UNA pregunta de seguimiento.
-5. NO diagnosticos medicos. NUNCA sumes kcal actividad a kcal ingeridas.
-6. Usa markdown con tablas para la comparacion de macros.
-7. Al final, en linea separada, escribe exactamente esto (JSON estrictamente valido: claves con comillas dobles, valores enteros sin texto adicional):
-MACROS:{"kcal":N,"prot":N,"cho":N,"grasa":N}
-N = entero de ESTA comida unicamente. Esta linea es obligatoria y debe ser la ULTIMA del mensaje, sin texto despues.`;
+const SYSTEM_CHECKIN = `Nutricionista de ${CONFIG.nombre}. ${CONFIG.perfil}
+${CONFIG.restricciones ? 'Restricciones: ' + CONFIG.restricciones : ''}
+Espanol, amable, metricas. Tabla metas vs consumido. 1 recomendacion. Estimaciones con "(est)". Max 1 pregunta. No diagnosticos. No sumar kcal ejercicio a ingeridas. Concisa: max 150 palabras antes del JSON.
+OBLIGATORIO al final (JSON, enteros, SOLO esta comida, sin texto despues):
+MACROS:{"kcal":N,"prot":N,"cho":N,"grasa":N}`;
 
 function buildSystemCerrar() {
-  return `Eres un asistente de nutricion profesional para ${CONFIG.nombre}. ${CONFIG.perfil}
-${CONFIG.restricciones ? 'RESTRICCIONES para recomendaciones: ' + CONFIG.restricciones : ''}
-REGLA CRITICA: Solo recomienda exactamente lo que haga falta para llegar a metas sin exceder NINGUN macro.`;
+  return `Nutricionista de ${CONFIG.nombre}. ${CONFIG.perfil}
+${CONFIG.restricciones ? 'Restricciones: ' + CONFIG.restricciones : ''}
+Solo recomienda lo que falta para llegar a metas sin exceder ningun macro. Concisa. Espanol.`;
 }
 
 function buildSystemResumen(metas) {
-  return `Eres un asistente de nutricion profesional para ${CONFIG.nombre}. ${CONFIG.perfil}
-Meta ajustada hoy: ${metas.kcal} kcal | ${metas.prot}g prot | ${metas.cho}g carbs | ${metas.grasa}g grasa
-Genera resumen diario en 500 palabras max con markdown:
-1) Tabla kcal/macros vs meta con indicadores
-2) Evaluacion de proteina
-3) Adherencia
-4) Tres prioridades para manana
-Tono profesional y motivador. En espanol.`;
+  return `Nutricionista de ${CONFIG.nombre}. ${CONFIG.perfil}
+Meta ajustada: ${metas.kcal}kcal|${metas.prot}P|${metas.cho}C|${metas.grasa}G.
+Resumen diario max 300 palabras, markdown: 1)Tabla macros vs meta 2)Proteina 3)Adherencia 4)3 prioridades manana. Espanol, motivador.`;
 }
 
 // ─── ESTADO GLOBAL ───────────────────────────
@@ -83,11 +76,11 @@ const TODAY = new Date().toDateString();
 
 // ─── FUNCION PROXY PARA CLAUDE API ──────────
 
-async function callClaude(system, messages, maxTokens) {
+async function callClaude(system, messages, maxTokens, model) {
   const res = await fetch('/.netlify/functions/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ system, messages, max_tokens: maxTokens || 1000 }),
+    body: JSON.stringify({ system, messages, max_tokens: maxTokens || 500, model: model || CONFIG.modeloCheckin }),
   });
 
   const data = await res.json();
@@ -467,14 +460,31 @@ function handlePhoto(e) {
     alert(`Foto muy grande (max ${Math.round(CONFIG.maxPhotoBytes / 1024 / 1024)} MB).`);
     return;
   }
-  photoMime = f.type;
   const r = new FileReader();
   r.onload = (ev) => {
-    photoB64 = ev.target.result.split(',')[1];
-    document.getElementById('photo-prev').src = ev.target.result;
-    document.getElementById('photo-prev-wrap').classList.add('show');
-    document.getElementById('photo-btn').classList.add('has');
-    document.getElementById('photo-lbl').textContent = '\u2713 Foto adjunta';
+    // Redimensionar para ahorrar tokens de vision (~90% menos tokens en fotos grandes)
+    const img = new Image();
+    img.onload = () => {
+      const max = CONFIG.maxImagePx || 768;
+      let w = img.width, h = img.height;
+      if (w > max || h > max) {
+        const ratio = Math.min(max / w, max / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const resizedUrl = canvas.toDataURL('image/jpeg', 0.75);
+      photoB64 = resizedUrl.split(',')[1];
+      photoMime = 'image/jpeg';
+      document.getElementById('photo-prev').src = resizedUrl;
+      document.getElementById('photo-prev-wrap').classList.add('show');
+      document.getElementById('photo-btn').classList.add('has');
+      document.getElementById('photo-lbl').textContent = '\u2713 Foto adjunta';
+    };
+    img.src = ev.target.result;
   };
   r.readAsDataURL(f);
 }
@@ -507,35 +517,35 @@ async function registrar() {
     '<div class="resp loading">Analizando tu comida\u2026 ' + CONFIG.emoji + '</div>';
   document.getElementById('save-st').textContent = '';
 
-  const prevHoy = log
-    .slice(-5)
-    .map((e) => `${e.meal}(${e.time}): ${e.food} | macros:${JSON.stringify(e.macros)}`)
-    .join('\n') || 'Sin registros previos hoy.';
   const actStr = getActStr();
   const metas = getMetas();
+  // Enviar solo totales consumidos (ahorra ~50-80 tokens vs listar cada comida)
+  const totales = log.reduce(
+    (a, e) => ({ k: a.k + (+e.macros.kcal || 0), p: a.p + (+e.macros.prot || 0), c: a.c + (+e.macros.cho || 0), g: a.g + (+e.macros.grasa || 0) }),
+    { k: 0, p: 0, c: 0, g: 0 }
+  );
+  const prevResumen = log.length
+    ? `Consumido hoy: ${Math.round(totales.k)}kcal/${Math.round(totales.p)}P/${Math.round(totales.c)}C/${Math.round(totales.g)}G (${log.length} comidas)`
+    : 'Primera comida del dia.';
 
   const content = [];
   if (photoB64) content.push({ type: 'image', source: { type: 'base64', media_type: photoMime, data: photoB64 } });
   content.push({
     type: 'text',
     text: [
-      `Comida: ${meal}`,
-      `Descripcion: ${desc || '(ver foto)'}`,
-      `Actividad hoy: ${actStr}`,
-      peso ? `Peso hoy: ${peso} kg` : null,
-      `Meta calorica ajustada hoy: ${metas.kcal} kcal | ${metas.prot}g prot | ${metas.cho}g carbs | ${metas.grasa}g grasa`,
-      '',
-      'Comidas previas hoy:',
-      prevHoy,
-      '',
-      'Realiza el check-in de esta comida.',
+      `${meal}: ${desc || '(ver foto)'}`,
+      `Act: ${actStr}`,
+      peso ? `Peso: ${peso}kg` : null,
+      `Meta: ${metas.kcal}kcal|${metas.prot}P|${metas.cho}C|${metas.grasa}G`,
+      prevResumen,
+      'Check-in de esta comida.',
     ]
       .filter((l) => l !== null)
       .join('\n'),
   });
 
   try {
-    const aiText = await callClaude(SYSTEM_CHECKIN, [{ role: 'user', content }], 1000);
+    const aiText = await callClaude(SYSTEM_CHECKIN, [{ role: 'user', content }], 500, CONFIG.modeloCheckin);
     const macros = extractMacros(aiText);
     const clean = cleanTxt(aiText);
     const entry = {
@@ -623,26 +633,21 @@ async function cerrarDia() {
     descMacro('Grasa', diff.grasa, falta.grasa, 'g'),
   ].join('\n');
 
-  const comidas =
-    log.map((e) => `${e.meal}: ${e.food} | macros:${JSON.stringify(e.macros)}`).join('\n') || 'Sin registros.';
+  // Formato compacto para comidas (cerrar dia necesita el detalle individual)
+  const comidas = log.map((e) => `${e.meal}: ${e.food} [${e.macros.kcal}/${e.macros.prot}/${e.macros.cho}/${e.macros.grasa}]`).join('\n');
   const hora = new Date().getHours();
   const momento = hora < 12 ? 'manana' : hora < 17 ? 'tarde' : 'noche';
 
-  const prompt = `${CONFIG.nombre} lleva registrado hoy:
+  const prompt = `Hoy:
 ${comidas}
-
-Meta del dia: ${metas.kcal} kcal | ${metas.prot}g prot | ${metas.cho}g carbs | ${metas.grasa}g grasa
-Consumido: ${Math.round(consumido.kcal)} kcal | ${Math.round(consumido.prot)}g prot | ${Math.round(consumido.cho)}g carbs | ${Math.round(consumido.grasa)}g grasa
-
-Estado real de cada macro:
+Meta: ${metas.kcal}kcal|${metas.prot}P|${metas.cho}C|${metas.grasa}G
+Consumido: ${Math.round(consumido.kcal)}kcal|${Math.round(consumido.prot)}P|${Math.round(consumido.cho)}C|${Math.round(consumido.grasa)}G
 ${estadoMacros}
-
-Hora del dia: ${momento}
-
-Dame exactamente 3 opciones de comida para cerrar el dia lo mas cerca posible al 100%. Considera el estado real de cada macro: si alguno ya esta excedido, NO agregues mas de ese macro. Si alguno falta, cubrelo. Usa formato markdown con tabla de macros por opcion. Se muy especifica con cantidades (gramos, tazas, piezas). Tono motivador.`;
+Hora: ${momento}
+3 opciones para cerrar al 100%. Tabla macros por opcion. Cantidades exactas (g, tazas, piezas).`;
 
   try {
-    const aiText = await callClaude(buildSystemCerrar(), [{ role: 'user', content: prompt }], 900);
+    const aiText = await callClaude(buildSystemCerrar(), [{ role: 'user', content: prompt }], 700, CONFIG.modeloCerrar);
     document.getElementById('cerrar-wrap').innerHTML = '<div class="resp">' + mdToHtml(aiText) + '</div>';
   } catch (e) {
     document.getElementById('cerrar-wrap').innerHTML =
@@ -732,12 +737,15 @@ async function guardarEdicion(idx) {
 
   const metas = getMetas();
   const actStr = getActStr();
-  const prevHoy =
-    log
-      .filter((_, i) => i !== idx)
-      .slice(-5)
-      .map((e) => `${e.meal}(${e.time}): ${e.food} | macros:${JSON.stringify(e.macros)}`)
-      .join('\n') || 'Sin registros previos.';
+  // Totales excluyendo la comida que se edita
+  const otros = log.filter((_, i) => i !== idx);
+  const totOtros = otros.reduce(
+    (a, e) => ({ k: a.k + (+e.macros.kcal || 0), p: a.p + (+e.macros.prot || 0), c: a.c + (+e.macros.cho || 0), g: a.g + (+e.macros.grasa || 0) }),
+    { k: 0, p: 0, c: 0, g: 0 }
+  );
+  const prevResumen = otros.length
+    ? `Otras comidas: ${Math.round(totOtros.k)}kcal/${Math.round(totOtros.p)}P/${Math.round(totOtros.c)}C/${Math.round(totOtros.g)}G`
+    : 'Unica comida del dia.';
 
   try {
     const aiText = await callClaude(
@@ -749,21 +757,18 @@ async function guardarEdicion(idx) {
             {
               type: 'text',
               text: [
-                `Comida: ${newMeal}`,
-                `Descripcion: ${newDesc}`,
-                `Actividad hoy: ${actStr}`,
-                `Meta calorica ajustada hoy: ${metas.kcal} kcal | ${metas.prot}g prot | ${metas.cho}g carbs | ${metas.grasa}g grasa`,
-                '',
-                'Otras comidas del dia:',
-                prevHoy,
-                '',
-                'Realiza el check-in de esta comida (es una correccion de un registro anterior).',
+                `${newMeal}: ${newDesc}`,
+                `Act: ${actStr}`,
+                `Meta: ${metas.kcal}kcal|${metas.prot}P|${metas.cho}C|${metas.grasa}G`,
+                prevResumen,
+                'Check-in (correccion de registro anterior).',
               ].join('\n'),
             },
           ],
         },
       ],
-      1000
+      500,
+      CONFIG.modeloCheckin
     );
     const macros = extractMacros(aiText);
     const clean = cleanTxt(aiText);
@@ -832,14 +837,15 @@ async function generarResumen() {
 
   const metas = getMetas();
   const todas = log
-    .map((e) => `${e.meal}(${e.time}): ${e.food} | macros:${JSON.stringify(e.macros)} | actividad:${e.actividad}`)
+    .map((e) => `${e.meal} ${e.time}: ${e.food} [${e.macros.kcal}/${e.macros.prot}/${e.macros.cho}/${e.macros.grasa}]`)
     .join('\n');
 
   try {
     const aiText = await callClaude(
       buildSystemResumen(metas),
-      [{ role: 'user', content: `Resumen del dia.\n\nComidas:\n${todas}` }],
-      1000
+      [{ role: 'user', content: `Resumen del dia:\n${todas}` }],
+      700,
+      CONFIG.modeloResumen
     );
     document.getElementById('resumen-wrap').innerHTML = '<div class="resp">' + mdToHtml(aiText) + '</div>';
   } catch (e) {

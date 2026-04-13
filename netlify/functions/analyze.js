@@ -61,6 +61,10 @@ exports.handler = async function (event) {
     };
   }
 
+  // Modelo configurable — solo los permitidos
+  const ALLOWED_MODELS = ['claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
+  const model = ALLOWED_MODELS.includes(payload.model) ? payload.model : 'claude-haiku-4-5-20251001';
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -70,8 +74,8 @@ exports.handler = async function (event) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: Math.min(Math.max(parseInt(max_tokens) || 1000, 100), 2000),
+        model,
+        max_tokens: Math.min(Math.max(parseInt(max_tokens) || 500, 100), 1500),
         system,
         messages,
       }),
