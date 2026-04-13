@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Mariana Nutrealia</title>
+
+<!-- PWA meta tags -->
+<meta name="theme-color" content="#D4A017">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Nutrealia">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Registro nutricional inteligente - Mariana Nutrealia">
+
+<!-- Manifest y iconos -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.svg">
+
+<!-- Fuentes -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<!-- Estilos -->
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+<div class="app">
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-name">Hola, <em>Mariana</em> 🍍</div>
+    <div class="hero-sub" id="fecha-hoy"></div>
+    <div class="status-row">
+      <div class="sdot" id="sdot" style="animation:pulse 1s infinite;background:#BA7517"></div>
+      <span id="slbl">Cargando registros de hoy…</span>
+    </div>
+  </div>
+
+  <!-- Macro bar -->
+  <div class="macro-bar">
+    <div class="mp" id="mp-kcal"><div class="val" id="mv-kcal">—</div><div class="lbl">kcal</div><div class="meta" id="mm-kcal">/1,800</div></div>
+    <div class="mp" id="mp-prot"><div class="val" id="mv-prot">—</div><div class="lbl">prot g</div><div class="meta">/120</div></div>
+    <div class="mp" id="mp-cho"><div class="val" id="mv-cho">—</div><div class="lbl">carbs g</div><div class="meta" id="mm-cho">/200</div></div>
+    <div class="mp" id="mp-grasa"><div class="val" id="mv-grasa">—</div><div class="lbl">grasa g</div><div class="meta">/60</div></div>
+  </div>
+
+  <!-- Activity banner -->
+  <div class="act-banner" id="act-banner"></div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="goTab('reg')">Registrar</button>
+    <button class="tab" onclick="goTab('hist')">Historial</button>
+    <button class="tab" onclick="goTab('prog')">Resumen</button>
+  </div>
+
+  <!-- Tab: Registrar -->
+  <div id="sec-reg" class="sec active">
+    <div class="card">
+      <div class="card-title">¿Qué comiste?</div>
+      <div class="meal-row">
+        <select id="meal-type">
+          <option>Desayuno</option>
+          <option>Almuerzo</option>
+          <option>Cena</option>
+          <option>Snack</option>
+        </select>
+        <span class="time-lbl" id="time-now"></span>
+      </div>
+      <textarea id="food-desc" placeholder="Ej: 2 huevos revueltos, 1 taza de avena con leche, 1 plátano…" rows="3"></textarea>
+      <div class="photo-area">
+        <button class="photo-btn" id="photo-btn" onclick="document.getElementById('file-in').click()">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/><circle cx="5.5" cy="7.5" r="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M1 11l3.5-3.5 2 2 3-3 4.5 4.5" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+          <span id="photo-lbl">Adjuntar foto de la comida</span>
+        </button>
+        <div class="photo-prev-wrap" id="photo-prev-wrap">
+          <img id="photo-prev" alt="vista previa">
+          <button class="photo-remove" onclick="clearPhoto()">✕</button>
+        </div>
+        <input type="file" id="file-in" accept="image/*" onchange="handlePhoto(event)">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Actividad de hoy</div>
+      <div class="act-row">
+        <button class="chip" onclick="toggleAct(this,'cardio')">🏃‍♀️ Cardio</button>
+        <button class="chip" onclick="toggleAct(this,'fuerza')">🏋️ Fuerza</button>
+        <button class="chip" onclick="toggleAct(this,'yoga')">🧘 Yoga</button>
+        <button class="chip" onclick="toggleAct(this,'caminar')">🚶‍♀️ Caminata</button>
+      </div>
+      <div class="peso-row" style="margin-top:10px">
+        <input class="peso-in" type="number" id="ejercicio-kcal" placeholder="0" step="10" min="0" max="2000">
+        <span class="peso-lbl">kcal quemadas en entrenamiento (opcional)</span>
+      </div>
+      <div class="peso-row">
+        <input class="peso-in" type="number" id="peso-hoy" placeholder="0.0" step="0.1" min="30" max="250">
+        <span class="peso-lbl">kg hoy (opcional)</span>
+      </div>
+    </div>
+
+    <button class="btn" id="submit-btn" onclick="registrar()">Analizar y registrar</button>
+    <div class="save-st" id="save-st"></div>
+    <div id="resp-wrap"></div>
+  </div>
+
+  <!-- Tab: Historial -->
+  <div id="sec-hist" class="sec">
+    <div class="card" id="hist-list">
+      <div class="empty">Sin registros esta sesión.<br>¡Registra tu primer alimento! 🍍<br><br><small>El historial completo está en tu Google Sheets.</small></div>
+    </div>
+  </div>
+
+  <!-- Tab: Resumen -->
+  <div id="sec-prog" class="sec">
+    <div class="prog-grid">
+      <div class="pg-card"><div class="pg-val" id="pg-comidas">0</div><div class="pg-lbl">comidas hoy</div></div>
+      <div class="pg-card"><div class="pg-val" id="pg-peso">—</div><div class="pg-lbl">peso registrado</div></div>
+    </div>
+    <div class="prog-bars" id="prog-bars"></div>
+    <button class="btn" id="summary-btn" onclick="generarResumen()">Ver resumen del día</button>
+    <button class="btn btn-pina" id="cerrar-btn" onclick="cerrarDia()" style="margin-top:8px">🎯 ¿Qué me falta para cerrar el día?</button>
+    <div id="resumen-wrap"></div>
+    <div id="cerrar-wrap"></div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>

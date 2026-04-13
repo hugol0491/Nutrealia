@@ -1,0 +1,185 @@
+/* ══════════════════════════════════════════════
+   Mariana Nutrealia — Estilos
+   Paleta: amarillo dorado / piña
+   ══════════════════════════════════════════════ */
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+
+:root{
+  --bg-pri:#ffffff;
+  --bg-sec:#FDF8EE;
+  --bg-ter:#FFFCF5;
+  --text-pri:#2A2518;
+  --text-sec:#8A7D65;
+  --text-ter:#B5A88D;
+  --border-ter:rgba(42,37,24,0.08);
+  --border-sec:rgba(42,37,24,0.15);
+  --border-pri:rgba(42,37,24,0.30);
+  --radius-md:10px;
+  --radius-lg:14px;
+  --pina:#D4A017;
+  --pina-light:#FFF3CC;
+  --pina-dark:#8B6508;
+  --ok:#3B6D11;
+  --err:#993556;
+  --warn:#BA7517;
+}
+
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg-pri:#1A1814;
+    --bg-sec:#231F18;
+    --bg-ter:#151210;
+    --text-pri:#F0EBE0;
+    --text-sec:#9A9280;
+    --text-ter:#6A6250;
+    --border-ter:rgba(240,235,224,0.06);
+    --border-sec:rgba(240,235,224,0.12);
+    --border-pri:rgba(240,235,224,0.25);
+    --pina-light:#2B2510;
+    --pina-dark:#E8C840;
+  }
+}
+
+html,body{height:100%;overflow-x:hidden}
+body{font-family:'DM Sans',sans-serif;background:var(--bg-ter);color:var(--text-pri);font-size:15px;-webkit-font-smoothing:antialiased}
+
+/* ── Layout ── */
+.app{max-width:420px;margin:0 auto;padding:0 0 4rem}
+
+/* ── Hero ── */
+.hero{text-align:center;padding:1.6rem 1rem 0.5rem}
+.hero-name{font-family:'DM Serif Display',serif;font-size:25px;letter-spacing:-0.3px}
+.hero-name em{color:var(--pina-dark);font-style:italic}
+.hero-sub{font-size:12px;color:var(--text-sec);margin-top:3px;font-weight:300;text-transform:capitalize}
+.status-row{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:7px;font-size:11px;color:var(--text-sec)}
+.sdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--ok);transition:background 0.3s}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.35}}
+
+/* ── Macro bar ── */
+.macro-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;padding:0.7rem 1rem 0.4rem}
+.mp{background:var(--bg-sec);border-radius:var(--radius-md);padding:8px 4px;text-align:center}
+.mp .val{font-size:15px;font-weight:600;color:var(--text-pri);transition:color 0.2s}
+.mp .lbl{font-size:10px;color:var(--text-sec);margin-top:1px}
+.mp .meta{font-size:9px;color:var(--text-ter);margin-top:1px}
+.mp.over .val{color:var(--err)}
+.mp.good .val{color:var(--ok)}
+
+/* ── Activity banner ── */
+.act-banner{margin:0 1rem 0.4rem;padding:6px 12px;border-radius:50px;background:var(--pina-light);font-size:11px;color:var(--pina-dark);text-align:center;display:none;border:0.5px solid var(--pina)}
+.act-banner.show{display:block}
+
+/* ── Tabs ── */
+.tabs{display:flex;margin:0 1rem 0.75rem;background:var(--bg-sec);border-radius:50px;padding:3px;gap:2px}
+.tab{flex:1;padding:7px 2px;border:none;background:transparent;border-radius:50px;font-size:12px;font-weight:500;color:var(--text-sec);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.18s}
+.tab.active{background:var(--bg-pri);color:var(--text-pri);border:0.5px solid var(--border-ter);box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+
+/* ── Sections ── */
+.sec{display:none;padding:0 1rem}
+.sec.active{display:block}
+
+/* ── Cards ── */
+.card{background:var(--bg-pri);border:0.5px solid var(--border-ter);border-radius:var(--radius-lg);padding:1rem;margin-bottom:0.75rem;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+.card-title{font-size:10px;font-weight:500;color:var(--text-sec);text-transform:uppercase;letter-spacing:0.7px;margin-bottom:10px}
+
+/* ── Meal row ── */
+.meal-row{display:flex;gap:8px;margin-bottom:10px;align-items:center}
+select{flex:1;border:0.5px solid var(--border-sec);border-radius:50px;padding:8px 14px;font-size:13px;background:var(--bg-pri);color:var(--text-pri);font-family:'DM Sans',sans-serif;appearance:none;-webkit-appearance:none;outline:none}
+select:focus{border-color:var(--border-pri)}
+.time-lbl{font-size:12px;color:var(--text-sec);white-space:nowrap;flex-shrink:0}
+
+/* ── Textarea ── */
+textarea{width:100%;border:0.5px solid var(--border-sec);border-radius:var(--radius-md);padding:10px 12px;font-size:13px;font-family:'DM Sans',sans-serif;color:var(--text-pri);background:var(--bg-pri);resize:none;min-height:70px;line-height:1.55;outline:none}
+textarea::placeholder{color:var(--text-ter)}
+textarea:focus{border-color:var(--border-pri)}
+
+/* ── Activity chips ── */
+.act-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chip{border:0.5px solid var(--border-sec);border-radius:50px;padding:5px 12px;font-size:12px;cursor:pointer;background:transparent;color:var(--text-sec);font-family:'DM Sans',sans-serif;transition:all 0.15s;user-select:none}
+.chip:active{transform:scale(0.96)}
+.chip.sel{background:var(--pina-light);color:var(--pina-dark);border-color:var(--pina)}
+
+/* ── Photo ── */
+.photo-area{margin-top:8px}
+.photo-btn{display:flex;align-items:center;justify-content:center;gap:7px;border:0.5px dashed var(--border-sec);border-radius:var(--radius-md);padding:10px 14px;font-size:13px;cursor:pointer;background:transparent;color:var(--text-sec);font-family:'DM Sans',sans-serif;width:100%;transition:all 0.15s}
+.photo-btn.has{border-color:var(--pina);border-style:solid;color:var(--pina-dark);background:var(--pina-light)}
+.photo-prev-wrap{position:relative;margin-top:8px;display:none}
+.photo-prev-wrap.show{display:block}
+#photo-prev{width:100%;border-radius:var(--radius-md);max-height:150px;object-fit:cover}
+.photo-remove{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.55);color:#fff;border:none;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+#file-in{display:none}
+
+/* ── Weight / exercise inputs ── */
+.peso-row{display:flex;gap:8px;align-items:center;margin-top:10px}
+.peso-in{width:80px;border:0.5px solid var(--border-sec);border-radius:50px;padding:7px 10px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--bg-pri);color:var(--text-pri);text-align:center;outline:none}
+.peso-in:focus{border-color:var(--border-pri)}
+.peso-lbl{font-size:12px;color:var(--text-sec)}
+
+/* ── Buttons ── */
+.btn{width:100%;padding:13px;background:var(--text-pri);color:var(--bg-pri);border:none;border-radius:50px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:10px;transition:opacity 0.15s,transform 0.1s}
+.btn:disabled{opacity:0.35;cursor:not-allowed}
+.btn:active:not(:disabled){opacity:0.75;transform:scale(0.98)}
+.btn-pina{background:var(--pina-light);color:var(--pina-dark);border:0.5px solid var(--pina)}
+
+/* ── Response ── */
+.resp{background:var(--bg-sec);border-radius:var(--radius-lg);padding:1rem;margin-top:0.75rem;font-size:13px;line-height:1.75;color:var(--text-pri);border:0.5px solid var(--border-ter)}
+.resp.loading{color:var(--text-sec);font-style:italic}
+.resp p{margin-bottom:0.5em}.resp p:last-child{margin-bottom:0}
+.resp strong{font-weight:600}
+.resp ul,.resp ol{margin:0.4em 0 0.4em 1.2em}
+.resp li{margin-bottom:0.2em}
+.resp h3,.resp h4{font-size:13px;font-weight:600;margin:0.6em 0 0.3em}
+.resp table{width:100%;border-collapse:collapse;margin:0.5em 0;font-size:12px}
+.resp th,.resp td{padding:4px 8px;text-align:left;border-bottom:0.5px solid var(--border-ter)}
+.resp th{font-weight:600;font-size:11px;color:var(--text-sec);text-transform:uppercase;letter-spacing:0.3px}
+
+/* ── Save status ── */
+.save-st{font-size:11px;margin-top:5px;min-height:14px;padding-left:2px}
+.save-st.ok{color:var(--ok)}
+.save-st.err{color:var(--err)}
+
+/* ── History log ── */
+.log-item{padding:10px 0;border-bottom:0.5px solid var(--border-ter)}
+.log-item:last-child{border-bottom:none}
+.log-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.badge{font-size:10px;padding:2px 9px;border-radius:50px;font-weight:500}
+.bd{background:#FFF3CC;color:#8B6508}
+.ba{background:#EAF3DE;color:#27500A}
+.bc{background:#E6F1FB;color:#0C447C}
+.bs{background:#FBEAF0;color:#72243E}
+.log-time{font-size:11px;color:var(--text-sec)}
+.log-food{font-size:13px;color:var(--text-pri);margin-bottom:3px}
+.log-macros{font-size:11px;color:var(--text-sec);margin-bottom:3px;display:flex;gap:8px;flex-wrap:wrap}
+.log-expand{font-size:12px;color:var(--pina-dark);cursor:pointer;background:none;border:none;font-family:'DM Sans',sans-serif;padding:2px 0}
+.log-detail{display:none;margin-top:6px}
+.log-detail.show{display:block}
+.log-edit-btn{font-size:12px;color:var(--text-ter);cursor:pointer;background:none;border:none;padding:2px 4px;line-height:1;border-radius:4px;transition:color 0.15s}
+.log-edit-btn:hover{color:var(--pina-dark)}
+.edit-form{display:none;margin-top:8px;padding-top:8px;border-top:0.5px solid var(--border-ter)}
+.edit-form.show{display:block}
+.edit-meal-sel{width:100%;border:0.5px solid var(--border-sec);border-radius:50px;padding:7px 14px;font-size:13px;background:var(--bg-sec);color:var(--text-pri);font-family:'DM Sans',sans-serif;appearance:none;-webkit-appearance:none;outline:none;margin-bottom:8px}
+.edit-btns{display:flex;gap:6px;margin-top:8px}
+.edit-btns .btn{margin-top:0;font-size:12px;padding:9px 12px;flex:1}
+.edit-st{font-size:11px;margin-top:5px;min-height:14px;color:var(--text-sec)}
+.edit-st.ok{color:var(--ok)}
+.edit-st.err{color:var(--err)}
+
+/* ── Empty state ── */
+.empty{text-align:center;padding:2rem 1rem;color:var(--text-sec);font-size:13px;line-height:1.7}
+.empty small{font-size:11px;opacity:0.7}
+
+/* ── Progress ── */
+.prog-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:1rem}
+.pg-card{background:var(--bg-sec);border-radius:var(--radius-md);padding:12px;text-align:center}
+.pg-val{font-size:20px;font-weight:600;color:var(--text-pri)}
+.pg-lbl{font-size:11px;color:var(--text-sec);margin-top:2px}
+.prog-bars{margin-bottom:1rem}
+.pbar-row{margin-bottom:8px}
+.pbar-head{display:flex;justify-content:space-between;margin-bottom:3px}
+.pbar-name{font-size:11px;font-weight:500;color:var(--text-sec)}
+.pbar-nums{font-size:11px;color:var(--text-sec)}
+.pbar-track{height:6px;background:var(--border-ter);border-radius:3px;overflow:hidden}
+.pbar-fill{height:100%;border-radius:3px;transition:width 0.4s ease}
+.pbar-fill.green{background:var(--ok)}
+.pbar-fill.yellow{background:var(--warn)}
+.pbar-fill.red{background:var(--err)}
