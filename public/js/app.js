@@ -13,7 +13,7 @@ const CONFIG = {
 
   // URL del Apps Script desplegado como web app
   // INSTRUCCION: reemplaza con tu URL real despues de publicar el Apps Script
-  sheetsUrl: 'REEMPLAZAR_CON_TU_URL_DE_APPS_SCRIPT',
+  sheetsUrl: 'https://script.google.com/macros/s/AKfycby-Oc0v1RqtESxe5g5YsIEKFl-gGZctzzuNxWwgbQvjHY2MaDUqKvFkucAcPYX45rcH/exec',
 
   // Metas nutricionales diarias base
   metas: { kcal: 1800, prot: 120, cho: 200, grasa: 60 },
