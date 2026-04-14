@@ -1,7 +1,7 @@
 // Service Worker — Mariana Nutrealia
 // Estrategia: cache-first para app shell, network-only para APIs
 
-const CACHE_NAME = 'nutrealia-v1';
+const CACHE_NAME = 'nutrealia-v2';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -53,7 +53,14 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => cached);
+        .catch(
+          () =>
+            cached ||
+            new Response('', {
+              status: 504,
+              statusText: 'Offline y sin cache',
+            })
+        );
 
       return cached || networkFetch;
     })
