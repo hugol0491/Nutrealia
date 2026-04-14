@@ -21,9 +21,16 @@ exports.handler = async function (event) {
   }
 
   // Validacion basica de origen (bloquea peticiones desde otros dominios)
+  // Netlify inyecta URL (principal), DEPLOY_URL (deploy actual) y DEPLOY_PRIME_URL (branch/preview).
   const origin = event.headers.origin || event.headers.referer || '';
-  const siteUrl = process.env.URL || ''; // Netlify inyecta URL del sitio automaticamente
-  if (siteUrl && origin && !origin.startsWith(siteUrl) && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+  const allowedOrigins = [process.env.URL, process.env.DEPLOY_URL, process.env.DEPLOY_PRIME_URL].filter(Boolean);
+  const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
+  const isAllowed =
+    !origin ||
+    isLocalhost ||
+    allowedOrigins.length === 0 ||
+    allowedOrigins.some((u) => origin.startsWith(u));
+  if (!isAllowed) {
     return {
       statusCode: 403,
       headers: { 'Content-Type': 'application/json' },
@@ -61,9 +68,11 @@ exports.handler = async function (event) {
     };
   }
 
-  // Modelo configurable — solo los permitidos
+  // Modelo configurable — solo los permitidos.
+  // Sonnet 4.6 usa alias oficial; Haiku 4.5 usa ID con fecha para pinning reproducible.
   const ALLOWED_MODELS = ['claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
-  const model = ALLOWED_MODELS.includes(payload.model) ? payload.model : 'claude-haiku-4-5-20251001';
+  const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+  const model = ALLOWED_MODELS.includes(payload.model) ? payload.model : DEFAULT_MODEL;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -75,7 +84,7 @@ exports.handler = async function (event) {
       },
       body: JSON.stringify({
         model,
-        max_tokens: Math.min(Math.max(parseInt(max_tokens) || 500, 100), 1500),
+        max_tokens: Math.min(Math.max(parseInt(max_tokens, 10) || 500, 100), 1500),
         system,
         messages,
       }),

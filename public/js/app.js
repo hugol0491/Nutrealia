@@ -72,7 +72,10 @@ let photoB64 = null;
 let photoMime = null;
 let acts = [];
 let ejercicioKcal = 0;
-const TODAY = new Date().toDateString();
+// Se recalcula en cada uso para que funcione si la PWA queda abierta al pasar medianoche.
+function todayKey() {
+  return new Date().toDateString();
+}
 
 // ─── FUNCION PROXY PARA CLAUDE API ──────────
 
@@ -121,7 +124,11 @@ function mdToHtml(text) {
   h = h.replace(/^## (.+)$/gm, '<h3>$1</h3>');
   h = h.replace(/^# (.+)$/gm, '<h3>$1</h3>');
   h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  h = h.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+  // Evita lookbehind (no soportado en Safari iOS < 16.4): usamos un marcador temporal
+  // para proteger los ** ya transformados y luego restituir los asteriscos de italicas.
+  h = h.replace(/<strong>/g, '\u0001strong\u0001').replace(/<\/strong>/g, '\u0001/strong\u0001');
+  h = h.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+  h = h.replace(/\u0001strong\u0001/g, '<strong>').replace(/\u0001\/strong\u0001/g, '</strong>');
   h = h.replace(/((?:^|\n)[-•*] .+(?:\n[-•*] .+)*)/g, (block) => {
     const items = block
       .trim()
@@ -140,7 +147,18 @@ function mdToHtml(text) {
   });
   h = h.replace(/\n{2,}/g, '</p><p>');
   h = '<p>' + h + '</p>';
-  h = h.replace(/(?<!>)\n(?!<)/g, '<br>');
+  // Reemplazo de saltos simples sin lookbehind: tokenizamos por '\n' y saltamos
+  // los que quedan junto a etiquetas de bloque.
+  h = h
+    .split('\n')
+    .map((part, i, arr) => {
+      if (i === 0) return part;
+      const prev = arr[i - 1];
+      const prevEndsWithTag = /[>]$/.test(prev);
+      const curStartsWithTag = /^</.test(part);
+      return (prevEndsWithTag || curStartsWithTag ? '' : '<br>') + part;
+    })
+    .join('');
   h = h.replace(/<p>\s*<\/p>/g, '');
   return h;
 }
@@ -175,7 +193,7 @@ function extractMacros(txt) {
       const b = m[1];
       const n = (k) => {
         const r = b.match(new RegExp('"?' + k + '"?\\s*:\\s*(\\d+)'));
-        return r ? Math.max(0, parseInt(r[1])) : 0;
+        return r ? Math.max(0, parseInt(r[1], 10)) : 0;
       };
       return { kcal: n('kcal'), prot: n('prot'), cho: n('cho'), grasa: n('grasa') };
     }
@@ -271,13 +289,6 @@ async function cargarHoy() {
   const dot = document.getElementById('sdot');
   const lbl = document.getElementById('slbl');
 
-  if (CONFIG.sheetsUrl.startsWith('REEMPLAZAR')) {
-    dot.style.animation = '';
-    dot.style.background = '#BA7517';
-    lbl.textContent = 'Google Sheets no configurado';
-    return;
-  }
-
   try {
     const url = CONFIG.sheetsUrl + '?localDate=' + fechaLocalHoy() + '&t=' + Date.now();
     const ac = new AbortController();
@@ -319,7 +330,7 @@ async function cargarHoy() {
   } catch (e) {
     dot.style.animation = '';
     dot.style.background = '#993556';
-    lbl.textContent = 'Sin conexion a Sheets \u2014 puedes registrar igual';
+    lbl.textContent = 'Sin conexi\u00f3n \u2014 puedes registrar igual';
     console.warn('Sheets GET:', e.message);
   }
 }
@@ -327,14 +338,8 @@ async function cargarHoy() {
 // ─── GOOGLE SHEETS: GUARDAR ──────────────────
 
 async function guardarSheets(entry, analisis) {
-  if (CONFIG.sheetsUrl.startsWith('REEMPLAZAR')) {
-    document.getElementById('save-st').textContent = '\u26a0 Google Sheets no configurado';
-    document.getElementById('save-st').className = 'save-st err';
-    return;
-  }
-
   const st = document.getElementById('save-st');
-  st.textContent = 'Guardando en Google Sheets\u2026';
+  st.textContent = 'Guardando\u2026';
   st.className = 'save-st';
   try {
     await fetch(CONFIG.sheetsUrl, {
@@ -353,18 +358,17 @@ async function guardarSheets(entry, analisis) {
         analisis: analisis.substring(0, 1500),
       }),
     });
-    st.textContent = '\u2713 Guardado en Google Sheets';
+    st.textContent = '\u2713 Guardado';
     st.className = 'save-st ok';
-    document.getElementById('slbl').textContent = `${log.length} registro${log.length > 1 ? 's' : ''} hoy \u00b7 Sheets \u2713`;
+    document.getElementById('slbl').textContent = `${log.length} registro${log.length > 1 ? 's' : ''} hoy \u00b7 guardado \u2713`;
     document.getElementById('sdot').style.background = '#3B6D11';
   } catch (e) {
-    st.textContent = '\u2715 No se pudo guardar en Sheets: ' + e.message;
+    st.textContent = '\u2715 No se pudo guardar: ' + e.message;
     st.className = 'save-st err';
   }
 }
 
 async function guardarEdicionSheets(entry, analisis) {
-  if (CONFIG.sheetsUrl.startsWith('REEMPLAZAR')) return;
   try {
     await fetch(CONFIG.sheetsUrl, {
       method: 'POST',
@@ -409,18 +413,18 @@ function toggleAct(el, val) {
   document.getElementById('ejercicio-kcal').value = chipKcal || '';
   updateBanner();
   try {
-    localStorage.setItem('mn_acts_' + TODAY, JSON.stringify(acts));
+    localStorage.setItem('mn_acts_' + todayKey(), JSON.stringify(acts));
   } catch {}
   try {
-    if (ejercicioKcal > 0) localStorage.setItem('mn_ejkcal_' + TODAY, ejercicioKcal);
-    else localStorage.removeItem('mn_ejkcal_' + TODAY);
+    if (ejercicioKcal > 0) localStorage.setItem('mn_ejkcal_' + todayKey(), ejercicioKcal);
+    else localStorage.removeItem('mn_ejkcal_' + todayKey());
   } catch {}
 }
 
 function restaurarEstado() {
   // Restaurar actividades
   try {
-    const savedActs = JSON.parse(localStorage.getItem('mn_acts_' + TODAY) || '[]');
+    const savedActs = JSON.parse(localStorage.getItem('mn_acts_' + todayKey()) || '[]');
     if (savedActs.length) {
       acts = savedActs;
       document.querySelectorAll('.chip').forEach((chip) => {
@@ -432,12 +436,12 @@ function restaurarEstado() {
   } catch {}
   // Restaurar peso
   try {
-    const savedPeso = localStorage.getItem('mn_peso_' + TODAY);
+    const savedPeso = localStorage.getItem('mn_peso_' + todayKey());
     if (savedPeso) document.getElementById('peso-hoy').value = savedPeso;
   } catch {}
   // Restaurar kcal de ejercicio
   try {
-    const savedEjKcal = parseInt(localStorage.getItem('mn_ejkcal_' + TODAY) || '0');
+    const savedEjKcal = parseInt(localStorage.getItem('mn_ejkcal_' + todayKey()) || '0', 10);
     if (savedEjKcal > 0) {
       ejercicioKcal = savedEjKcal;
       document.getElementById('ejercicio-kcal').value = savedEjKcal;
@@ -567,7 +571,7 @@ async function registrar() {
     clearPhoto();
   } catch (err) {
     document.getElementById('resp-wrap').innerHTML =
-      `<div class="resp loading">Error: ${escH(err.message)}<br><br>Verifica tu conexion e intenta de nuevo.</div>`;
+      `<div class="resp loading">Error: ${escH(err.message)}<br><br>Verifica tu conexi\u00f3n e intenta de nuevo.</div>`;
   }
   btn.disabled = false;
   btn.textContent = 'Analizar y registrar';
@@ -579,13 +583,13 @@ async function cerrarDia() {
   const btn = document.getElementById('cerrar-btn');
   if (!log.length) {
     document.getElementById('cerrar-wrap').innerHTML =
-      '<div class="resp">Todavia no hay comidas registradas hoy. Registra tu primera comida. ' + CONFIG.emoji + '</div>';
+      '<div class="resp">Todav\u00eda no hay comidas registradas hoy. Registra tu primera comida. ' + CONFIG.emoji + '</div>';
     return;
   }
   btn.disabled = true;
   btn.textContent = 'Calculando\u2026';
   document.getElementById('cerrar-wrap').innerHTML =
-    '<div class="resp loading">Calculando lo que te falta\u2026 ' + CONFIG.emoji + '</div>';
+    '<div class="resp loading">Calculando lo que te falta para cerrar el d\u00eda\u2026 ' + CONFIG.emoji + '</div>';
 
   const metas = getMetas();
   const consumido = log.reduce(
@@ -615,9 +619,9 @@ async function cerrarDia() {
   const sinExcesos = diff.kcal >= -50 && diff.prot >= -5 && diff.cho >= -10 && diff.grasa >= -5;
   if (todoCubierto && sinExcesos) {
     document.getElementById('cerrar-wrap').innerHTML =
-      '<div class="resp">Ya cerraste el dia al 100%! Tus macros estan completos. ' + CONFIG.emoji + '</div>';
+      '<div class="resp">\u00a1Ya cerraste el d\u00eda al 100%! Tus macros est\u00e1n completos. ' + CONFIG.emoji + '</div>';
     btn.disabled = false;
-    btn.textContent = 'Que me falta para cerrar el dia?';
+    btn.textContent = '\ud83c\udfaf \u00bfQu\u00e9 me falta para cerrar el d\u00eda?';
     return;
   }
 
@@ -626,6 +630,8 @@ async function cerrarDia() {
     if (falt === 0) return `${nombre}: cubierta (no agregar mas)`;
     return `${nombre}: faltan ${falt}${unit}`;
   }
+  // Estos textos se envian dentro del prompt a Claude (no se muestran en UI).
+  // Se mantienen sin acentos para no afectar la eficiencia de tokens.
   const estadoMacros = [
     descMacro('Calorias', diff.kcal, falta.kcal, 'kcal'),
     descMacro('Proteina', diff.prot, falta.prot, 'g'),
@@ -651,10 +657,10 @@ Hora: ${momento}
     document.getElementById('cerrar-wrap').innerHTML = '<div class="resp">' + mdToHtml(aiText) + '</div>';
   } catch (e) {
     document.getElementById('cerrar-wrap').innerHTML =
-      `<div class="resp loading">Error: ${escH(e.message)}<br><br>Verifica tu conexion e intenta de nuevo.</div>`;
+      `<div class="resp loading">Error: ${escH(e.message)}<br><br>Verifica tu conexi\u00f3n e intenta de nuevo.</div>`;
   }
   btn.disabled = false;
-  btn.textContent = 'Que me falta para cerrar el dia?';
+  btn.textContent = '\ud83c\udfaf \u00bfQu\u00e9 me falta para cerrar el d\u00eda?';
 }
 
 // ─── HISTORIAL ───────────────────────────────
@@ -663,9 +669,9 @@ function renderHist() {
   const c = document.getElementById('hist-list');
   if (!log.length) {
     c.innerHTML =
-      '<div class="empty">Sin registros esta sesion.<br>Registra tu primer alimento. ' +
+      '<div class="empty">Sin registros esta sesi\u00f3n.<br>\u00a1Registra tu primer alimento! ' +
       CONFIG.emoji +
-      '<br><br><small>El historial completo esta en tu Google Sheets.</small></div>';
+      '<br><br><small>El historial completo est\u00e1 en los registros de Nutrealia en manos expertas, \u00a1gracias por confiar en Nutrealia!</small></div>';
     return;
   }
   const bc = { Desayuno: 'bd', Almuerzo: 'ba', Cena: 'bc', Snack: 'bs' };
@@ -805,8 +811,8 @@ function renderProg() {
   const lp = [...log].reverse().find((e) => e.peso);
   document.getElementById('pg-peso').textContent = lp ? lp.peso + ' kg' : '\u2014';
   const bars = [
-    { label: 'Calorias', key: 'kcal', unit: 'kcal' },
-    { label: 'Proteina', key: 'prot', unit: 'g' },
+    { label: 'Calor\u00edas', key: 'kcal', unit: 'kcal' },
+    { label: 'Prote\u00edna', key: 'prot', unit: 'g' },
     { label: 'Carbohidratos', key: 'cho', unit: 'g' },
     { label: 'Grasa', key: 'grasa', unit: 'g' },
   ];
@@ -833,7 +839,7 @@ async function generarResumen() {
   btn.disabled = true;
   btn.textContent = 'Generando\u2026';
   document.getElementById('resumen-wrap').innerHTML =
-    '<div class="resp loading">Preparando tu resumen del dia\u2026 ' + CONFIG.emoji + '</div>';
+    '<div class="resp loading">Preparando tu resumen del d\u00eda\u2026 ' + CONFIG.emoji + '</div>';
 
   const metas = getMetas();
   const todas = log
@@ -850,10 +856,10 @@ async function generarResumen() {
     document.getElementById('resumen-wrap').innerHTML = '<div class="resp">' + mdToHtml(aiText) + '</div>';
   } catch (e) {
     document.getElementById('resumen-wrap').innerHTML =
-      `<div class="resp loading">Error: ${escH(e.message)}<br><br>Verifica tu conexion e intenta de nuevo.</div>`;
+      `<div class="resp loading">Error: ${escH(e.message)}<br><br>Verifica tu conexi\u00f3n e intenta de nuevo.</div>`;
   }
   btn.disabled = false;
-  btn.textContent = 'Ver resumen del dia';
+  btn.textContent = 'Ver resumen del d\u00eda';
 }
 
 // ─── INICIALIZACION ──────────────────────────
@@ -865,17 +871,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // Guardar peso al escribirlo
   document.getElementById('peso-hoy').addEventListener('input', function () {
     try {
-      if (this.value) localStorage.setItem('mn_peso_' + TODAY, this.value);
+      if (this.value) localStorage.setItem('mn_peso_' + todayKey(), this.value);
     } catch {}
   });
 
   // Guardar y aplicar kcal de ejercicio
   document.getElementById('ejercicio-kcal').addEventListener('input', function () {
-    ejercicioKcal = Math.max(0, parseInt(this.value) || 0);
+    ejercicioKcal = Math.max(0, parseInt(this.value, 10) || 0);
     updateBanner();
     try {
-      if (ejercicioKcal > 0) localStorage.setItem('mn_ejkcal_' + TODAY, ejercicioKcal);
-      else localStorage.removeItem('mn_ejkcal_' + TODAY);
+      if (ejercicioKcal > 0) localStorage.setItem('mn_ejkcal_' + todayKey(), ejercicioKcal);
+      else localStorage.removeItem('mn_ejkcal_' + todayKey());
     } catch {}
   });
 
