@@ -650,7 +650,7 @@ Meta: ${metas.kcal}kcal|${metas.prot}P|${metas.cho}C|${metas.grasa}G
 Consumido: ${Math.round(consumido.kcal)}kcal|${Math.round(consumido.prot)}P|${Math.round(consumido.cho)}C|${Math.round(consumido.grasa)}G
 ${estadoMacros}
 Hora: ${momento}
-3 opciones para cerrar al 100%. Tabla macros por opcion. Cantidades exactas (g, tazas, piezas).`;
+2 opciones para cerrar al 100%. Tabla macros por opcion. Cantidades exactas (g, tazas, piezas).`;
 
   try {
     const aiText = await callClaude(buildSystemCerrar(), [{ role: 'user', content: prompt }], 700, CONFIG.modeloCerrar);
