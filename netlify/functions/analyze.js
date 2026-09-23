@@ -69,10 +69,18 @@ exports.handler = async function (event) {
   }
 
   // Modelo configurable — solo los permitidos.
-  // Sonnet 4.6 usa alias oficial; Haiku 4.5 usa ID con fecha para pinning reproducible.
-  const ALLOWED_MODELS = ['claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
+  // Haiku 4.5 usa ID con fecha para pinning reproducible.
+  // Sonnet 4.6 se sustituye por Sonnet 5 (mejor y más barato): se mapea aquí también para
+  // los celulares que aún tengan el app.js viejo en caché y sigan pidiendo 'claude-sonnet-4-6'.
+  const ALLOWED_MODELS = ['claude-sonnet-5', 'claude-haiku-4-5-20251001'];
   const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
-  const model = ALLOWED_MODELS.includes(payload.model) ? payload.model : DEFAULT_MODEL;
+  const pedido = payload.model === 'claude-sonnet-4-6' ? 'claude-sonnet-5' : payload.model;
+  const model = ALLOWED_MODELS.includes(pedido) ? pedido : DEFAULT_MODEL;
+  const esSonnet5 = model === 'claude-sonnet-5';
+  // Sonnet 5 cuenta ~30% más tokens por el mismo texto que Sonnet 4.6: se escala el límite
+  // pedido para no cortar respuestas que antes cabían.
+  const pedidoTokens = Math.min(Math.max(parseInt(max_tokens, 10) || 500, 100), 1500);
+  const maxTokens = esSonnet5 ? Math.ceil(pedidoTokens * 1.3) : pedidoTokens;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -84,7 +92,10 @@ exports.handler = async function (event) {
       },
       body: JSON.stringify({
         model,
-        max_tokens: Math.min(Math.max(parseInt(max_tokens, 10) || 500, 100), 1500),
+        max_tokens: maxTokens,
+        // Sonnet 5 razona por defecto si no se indica; Sonnet 4.6 no lo hacía. Se apaga para
+        // conservar la misma rapidez y que el razonamiento no se coma el límite de tokens.
+        ...(esSonnet5 ? { thinking: { type: 'disabled' } } : {}),
         system,
         messages,
       }),

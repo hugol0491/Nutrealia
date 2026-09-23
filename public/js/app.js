@@ -33,10 +33,10 @@ const CONFIG = {
   restricciones: '',
 
   // Modelos por funcion — Haiku es ~75% mas barato, adecuado para estimacion de macros
-  // Opciones: 'claude-sonnet-4-6' o 'claude-haiku-4-5-20251001'
-  modeloCheckin: 'claude-sonnet-4-6',
-  modeloCerrar: 'claude-sonnet-4-6',
-  modeloResumen: 'claude-sonnet-4-6',
+  // Opciones: 'claude-sonnet-5' o 'claude-haiku-4-5-20251001'
+  modeloCheckin: 'claude-sonnet-5',
+  modeloCerrar: 'claude-sonnet-5',
+  modeloResumen: 'claude-sonnet-5',
 
   // Tamano maximo de foto en bytes (3 MB para no exceder limites de Netlify Functions)
   maxPhotoBytes: 3 * 1024 * 1024,
